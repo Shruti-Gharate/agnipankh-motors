@@ -1,6 +1,28 @@
 import { useState } from "react";
 import "./App.css";
 
+async function getBotReplyFromServer(message) {
+  try {
+    const response = await fetch("http://localhost:3000/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      return "Sorry, there was a problem talking to the server.";
+    }
+
+    const data = await response.json();
+    return data.reply || "Sorry, I couldn't understand the response.";
+  } catch (error) {
+    console.error("Error calling backend:", error);
+    return "Sorry, I’m having trouble connecting right now.";
+  }
+}
+
 // App = root component for the entire page
 function App() {
   return (
@@ -495,17 +517,30 @@ function ChatbotWidget() {
 
   const handleToggle = () => setIsOpen((prev) => !prev);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed) return;
+    if (!trimmed || isLoading) return;
 
     const userMessage = { from: "user", text: trimmed };
-    const botMessage = { from: "bot", text: getBotReply(trimmed) };
-
-    setMessages((prev) => [...prev, userMessage, botMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
-  };
+    setIsLoading(true);
+
+  // temporary typing message
+    const typingMessage = { from: "bot", text: "Typing...", temp: true };
+    setMessages((prev) => [...prev, userMessage, typingMessage]);
+
+    const replyText = await getBotReplyFromServer(trimmed);
+
+    setMessages((prev) => {
+      const withoutTemp = prev.filter((m) => !m.temp);
+      return [...withoutTemp, { from: "bot", text: replyText }];
+  });
+
+    setIsLoading(false);
+};
+
 
   return (
     <>
